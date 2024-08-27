@@ -16,11 +16,11 @@ const char *PASSWORD = nullptr;
 const char *HOST = nullptr;
 const char *TOKEN = nullptr;
 
-const int BOX_OCCUPIED_THRE = 51.0;  // cm
+const int BOX_OCCUPIED_THRE = 50.5;  // cm
 
 int cnt_detected = 0;
-const int INTERVAL = 1 * 1000;  // ms
-const int INTERVAL_LONG = 60 * 12;  // 60sec * 60 * 12h = 12h
+const int INTERVAL = 10 * 1000;  // ms
+const int INTERVAL_LONG = 6 * 60 * 12;  // 10sec * 6 * 60 * 12h = 12h
 
 // INIファイルのパース関数
 void parse_config(File file) {
