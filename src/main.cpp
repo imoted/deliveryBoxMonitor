@@ -16,7 +16,7 @@ const char *PASSWORD = nullptr;
 const char *HOST = nullptr;
 const char *TOKEN = nullptr;
 
-const int BOX_OCCUPIED_THRE = 50.5;  // cm
+const int BOX_OCCUPIED_THRE = 51.0;  // cm
 
 int cnt_detected = 0;
 const int INTERVAL = 10 * 1000;  // ms
@@ -88,7 +88,7 @@ private:
 int DeliveryBox::judgeBoxOccupied(double distance)
 {
   int status = 0;
-  if (cnt_detected == 1) {
+  if (cnt_detected == 2) {
     if (distance < BOX_OCCUPIED_THRE) {
       status = 2;
     }
@@ -98,7 +98,7 @@ int DeliveryBox::judgeBoxOccupied(double distance)
       status = 3;
     }
   }
-  if (cnt_detected > 0 && BOX_OCCUPIED_THRE < distance) {
+  if (cnt_detected > 2 && BOX_OCCUPIED_THRE < distance) {
     status = 4;
   }
   if (distance < BOX_OCCUPIED_THRE) {
