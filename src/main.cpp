@@ -88,7 +88,7 @@ private:
 int DeliveryBox::judgeBoxOccupied(double distance)
 {
   int status = 0;
-  if (cnt_detected == 2) {
+  if (cnt_detected == 5) {
     if (distance < BOX_OCCUPIED_THRE) {
       status = 2;
     }
@@ -98,7 +98,7 @@ int DeliveryBox::judgeBoxOccupied(double distance)
       status = 3;
     }
   }
-  if (cnt_detected > 2 && BOX_OCCUPIED_THRE < distance) {
+  if (cnt_detected > 5 && BOX_OCCUPIED_THRE < distance) {
     status = 4;
   }
   if (distance < BOX_OCCUPIED_THRE) {
@@ -162,6 +162,35 @@ void setup()
 
 void loop()
 {
+  // Check if WiFi is disconnected, and reconnect if necessary
+  if (WiFi.status() != WL_CONNECTED) {
+    AtomS3.dis.drawpix(0xff0000);  //赤色
+    AtomS3.update();
+    USBSerial.println("WiFi disconnected. Attempting to reconnect...");
+
+    WiFi.disconnect();
+    WiFi.begin(SSID, PASSWORD);
+
+    unsigned long startAttemptTime = millis();
+
+    // Attempt to reconnect for 10 seconds
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
+      delay(500);
+      USBSerial.print(".");
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      USBSerial.println("Reconnected to WiFi!");
+      AtomS3.dis.drawpix(0x0000ff);  //青色
+      AtomS3.update();
+    } else {
+      USBSerial.println("Failed to reconnect to WiFi.");
+      AtomS3.dis.drawpix(0xffff00);  //黄色
+      AtomS3.update();
+      // You may want to return here or delay further attempts
+    }
+  }
+
   for (int i = 0; i < BOX_NUM; i++) {
     double distance = deliveryBox[i].measureDist(HCSR04Trg[i], HCSR04Echo[i]);
     USBSerial.println(BOX_LABEL[i] + "の距離: " + String(distance) + "cm");
