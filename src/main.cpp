@@ -17,7 +17,7 @@ const char *HOST = nullptr;
 const char *TOKEN = nullptr;
 
 const int BOX_OCCUPIED_THRE = 51.0;  // cm
-const int CNT_THRETHOLD = 20;
+const int CNT_THRETHOLD = 50;
 
 int cnt_detected = 0;
 const int INTERVAL = 10 * 1000;  // ms
