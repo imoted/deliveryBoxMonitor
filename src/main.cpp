@@ -16,7 +16,7 @@ const char *PASSWORD = nullptr;
 const char *HOST = nullptr;
 const char *TOKEN = nullptr;
 
-const int BOX_OCCUPIED_THRE = 51.0;  // cm
+const int BOX_OCCUPIED_THRE = 50.0;  // cm
 const int CNT_THRETHOLD = 50;
 
 int cnt_detected = 0;
