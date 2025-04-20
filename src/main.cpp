@@ -13,8 +13,9 @@ const String BOX_LABEL[] = {"上段", "下段"};
 
 const char *SSID = nullptr;
 const char *PASSWORD = nullptr;
-const char *HOST = nullptr;
-const char *TOKEN = nullptr;
+const char *HOST = "api.line.me";
+const char *USER_ID = nullptr;
+const char *CHANNEL_TOKEN = nullptr;
 
 const int BOX_OCCUPIED_THRE = 50.0;  // cm
 const int CNT_THRETHOLD = 50;
@@ -50,10 +51,10 @@ void parse_config(File file) {
             SSID = strdup(value.c_str());
         } else if (key == "WIFI_PASSWORD") {
             PASSWORD = strdup(value.c_str());
-        } else if (key == "API_HOST") {
-            HOST = strdup(value.c_str());
-        } else if (key == "API_TOKEN") {
-            TOKEN = strdup(value.c_str());
+        } else if (key == "USER_ID") {
+            USER_ID = strdup(value.c_str());
+        } else if (key == "CHANNEL_TOKEN") {
+            CHANNEL_TOKEN = strdup(value.c_str());
         }
     }
 }
@@ -63,16 +64,40 @@ bool line_notify(String msg)
   WiFiClientSecure client;
   client.setInsecure();
   if (!client.connect(HOST, 443)) {
-    AtomS3.dis.drawpix(0xFFFF00);  //黄色
+    AtomS3.dis.drawpix(0xFFFF00);  // Yellow
     AtomS3.update();
     return false;
   }
-  String query = String("message=") + msg;
-  String request = String("") + "POST /api/notify HTTP/1.1\r\n" + "Host: " + HOST + "\r\n" +
-                   "Authorization: Bearer " + TOKEN + "\r\n" +
-                   "Content-Length: " + String(query.length()) + "\r\n" +
-                   "Content-Type: application/x-www-form-urlencoded\r\n\r\n" + query + "\r\n";
+
+  // JSONデータの作成
+  String jsonData = "{\"to\":\"" + String(USER_ID) + "\",\"messages\":[{\"type\":\"text\",\"text\":\"" + msg + "\"}]}";
+
+  String request = String("POST /v2/bot/message/push HTTP/1.1\r\n") +
+                   "Host: " + HOST + "\r\n" +
+                   "Authorization: Bearer " + CHANNEL_TOKEN + "\r\n" +
+                   "Content-Type: application/json\r\n" +
+                   "Content-Length: " + String(jsonData.length()) + "\r\n" +
+                   "Connection: close\r\n\r\n" +
+                   jsonData;
+
   client.print(request);
+
+  // レスポンスの確認（オプション）
+  // タイムアウトの設定
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      client.stop();
+      return false;
+    }
+  }
+
+  // レスポンスの読み取り
+  while (client.available()) {
+    String line = client.readStringUntil('\r');
+    // 必要に応じてレスポンスを処理
+  }
+
   return true;
 }
 
