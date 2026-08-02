@@ -40,17 +40,22 @@ const int HCSR04Echo[] = {7, 5};  // エコーピン
 const String BOX_LABEL[] = {"上段", "下段"};
 ```
 
-4. config.ini ファイルを /data ディレクトリに作成し、WiFiのSSID、パスワード、APIホスト、およびAPIトークンを設定します。
+4. テンプレートから `data/config.ini` を作成し、WiFiのSSID、パスワード、LINEのトークン、OTAの設定を記述します。
+
+```bash
+cp data/config.ini.example data/config.ini
+```
 
 ```
-[WIFI]
-WIFI_SSID = "your_wifi_ssid"
-WIFI_PASSWORD = "your_wifi_password"
-
-[API]
-API_HOST = "api.host.url"
-API_TOKEN = "your_api_token"
+WIFI_SSID=your_wifi_ssid
+WIFI_PASSWORD=your_wifi_password
+CHANNEL_TOKEN=your_line_channel_access_token
+USER_ID=your_line_user_id
+OTA_HOSTNAME=boxmonitor
+OTA_PASSWORD=change_me
 ```
+
+`data/config.ini` は `.gitignore` 済みなのでコミットされません（`data/config.ini.example` のみ追跡対象）。`#` または `;` で始まる行はコメントとして無視されます。
 
 5. プロジェクトをコンパイルし、M5Stack AtomS3 Liteにアップロードします。
 
@@ -61,11 +66,97 @@ API_TOKEN = "your_api_token"
 
 物が取り出された場合や、一定時間以上物が入ったままの場合も、LINEに通知が送信されます。
 
+## OTA（無線でのファームウェア更新）
+
+WiFi経由でファームウェアを書き換えられます（ArduinoOTA / espota）。デバイスと作業PCが**同じLAN**にいる必要があります。
+
+### 事前準備（初回のみ）
+
+1. `data/config.ini` に OTA 設定を書く。
+
+   ```
+   OTA_HOSTNAME=boxmonitor
+   OTA_PASSWORD=boxmonitor
+   ```
+
+2. `platformio.ini` の `[env:ota]` の `upload_port` / `--auth` を config.ini と一致させる。
+
+   ```ini
+   [env:ota]
+   upload_port = boxmonitor.local
+   upload_flags =
+       --port=3232
+       --auth=boxmonitor
+   ```
+
+3. **1回だけUSBで書き込む**。OTA対応のファームが載っていないと無線更新は始められない。
+
+   ```bash
+   pio run -e m5stack-atoms3 -t uploadfs   # config.ini をSPIFFSへ
+   pio run -e m5stack-atoms3 -t upload     # ファームウェア
+   ```
+
+4. シリアルモニタで OTA が待ち受けに入ったことを確認する。
+
+   ```bash
+   pio device monitor -e m5stack-atoms3
+   # => OTA ready: boxmonitor.local:3232 (192.168.x.x) fw=1.1.0
+   ```
+
+### 2回目以降（OTAでの更新手順）
+
+```bash
+# 1. コードを編集する
+# 2. ビルドが通ることを確認
+pio run -e ota
+
+# 3. 無線で書き込み
+pio run -e ota -t upload
+```
+
+デバイス側のLEDが**紫の点滅**になれば転送中、完了すると**緑**になって自動的に再起動します。再起動後は通常どおり青（WiFi接続済み）に戻ります。
+
+設定ファイル（`data/config.ini`）だけを更新したい場合は SPIFFS も無線で送れます。
+
+```bash
+pio run -e ota -t uploadfs
+```
+
+> ファームのOTAはSPIFFSを書き換えないため、config.iniを変えたときだけ `uploadfs` を実行すればよい。
+
+### mDNSが引けない場合
+
+`boxmonitor.local` が名前解決できない環境（Windowsやゲスト分離されたWiFiなど）では、IPアドレスを直接指定する。
+
+```bash
+pio run -e ota -t upload --upload-port 192.168.1.42
+```
+
+IPアドレスはシリアルモニタの `OTA ready:` 行か、ルーターのDHCPクライアント一覧で確認できる。
+
+### LEDの色と状態
+
+| 色 | 状態 |
+|----|------|
+| 青 | WiFi接続済み・通常動作 |
+| 赤 | WiFi接続中／OTA失敗 |
+| 黄 | WiFi再接続に失敗（5秒後にリトライ）／LINE送信失敗 |
+| 紫（点滅） | OTA転送中 |
+| 緑 | OTA成功（この直後に再起動） |
+
+### 注意点
+
+- OTA中はセンサー計測とLINE通知が停止する（転送が終わると自動復帰）。
+- パーティションは `default_8MB.csv`（app0 / app1 各3.3MB）を使っており、OTA用の設定変更は不要。現在のファームは約1.07MBなので余裕がある。
+- OTAが失敗した場合はデバイスは書き換え前のファームで動き続ける。復旧不能になった場合はUSBで書き直す。
+- `OTA_PASSWORD` は認証に使われる。LAN内からの意図しない書き換えを防ぐため、運用時はデフォルトから変更すること。
+
 ## ファイル構成
 
 src/main.cpp: メインコードファイル
-platformio.ini: プロジェクト設定ファイル
-/data/config.ini: WiFiおよびAPI設定ファイル（SPIFFSに保存）
+platformio.ini: プロジェクト設定ファイル（`m5stack-atoms3` = USB書き込み / `ota` = 無線書き込み）
+/data/config.ini: WiFi・LINE・OTA設定ファイル（SPIFFSに保存 / gitignore対象）
+/data/config.ini.example: 上記のテンプレート
 
 ## ライセンス
 このプロジェクトはMITライセンスのもとで公開されています。詳細はLICENSEファイルを参照してください。

@@ -1,0 +1,23 @@
+# BoxMonitor 設定ファイルのテンプレート
+#
+# 使い方:
+#   cp data/config.ini.example data/config.ini
+#   実際の値に書き換えてから  pio run -t uploadfs  でSPIFFSへ書き込む
+#
+# data/config.ini は .gitignore 済み（コミットしないこと）
+
+# --- WiFi ---
+WIFI_SSID=your_wifi_ssid
+WIFI_PASSWORD=your_wifi_password
+
+# --- LINE Messaging API ---
+# CHANNEL_TOKEN: LINE Developers > Messaging API > チャネルアクセストークン
+# USER_ID:       通知の宛先（ユーザーID / グループID）
+CHANNEL_TOKEN=your_line_channel_access_token
+USER_ID=your_line_user_id
+
+# --- OTA ---
+# OTA_HOSTNAME: mDNS名。<OTA_HOSTNAME>.local で書き込む
+# OTA_PASSWORD: espota の --auth と一致させる（platformio.ini の [env:ota]）
+OTA_HOSTNAME=boxmonitor
+OTA_PASSWORD=change_me
