@@ -5,12 +5,16 @@
 #include "FS.h"
 #include "SPIFFS.h"
 
-const char *FW_VERSION = "1.2.0";
+const char *FW_VERSION = "1.3.0";
 
 const int BOX_NUM = 2;
 
 const int HCSR04Trg[] = {8, 6};   //使用するGPIOピン
 const int HCSR04Echo[] = {7, 5};  //使用するGPIOピン
+
+// 在荷表示LED（赤）。Grove端子から1m延長した先に取り付ける。
+// G1(黄) = 上段 / G2(白) = 下段。120Ωを基板側に直列に入れて約10mAで駆動する。
+const int LED_PIN[] = {1, 2};
 
 const String BOX_LABEL[] = {"上段", "下段"};
 
@@ -27,6 +31,10 @@ const int OTA_PORT = 3232;
 
 const int BOX_OCCUPIED_THRE = 50.0;  // cm
 const int CNT_THRETHOLD = 50;
+
+// 在荷表示LEDの判定
+const double DIST_MIN_VALID = 2.0;  // cm 未満は計測失敗とみなす（HC-SR04の最短測定距離）
+const int LED_DEBOUNCE = 2;         // 同じ判定がこの回数続いたらLEDに反映する
 
 int cnt_detected = 0;
 const int INTERVAL = 10 * 1000;  // ms
@@ -407,9 +415,13 @@ class DeliveryBox
 public:
   int judgeBoxOccupied(double distance);
   double measureDist(int Trg, int Echo);
+  void updateOccupiedLed(int led_pin, const String &label, double distance);
 
 private:
   int cnt_detected;
+  bool led_on;        // 現在のLED状態
+  bool last_occupied; // 直近の計測での在荷判定
+  int cnt_same;       // 同じ判定が連続した回数
 };
 
 int DeliveryBox::judgeBoxOccupied(double distance)
@@ -436,6 +448,34 @@ int DeliveryBox::judgeBoxOccupied(double distance)
   return status;
 }
 
+// 通知（judgeBoxOccupied）はCNT_THRETHOLD回の連続検知を待つが、LEDは目視用なので
+// 短いデバウンスだけかけて直近の計測を素直に反映する。
+void DeliveryBox::updateOccupiedLed(int led_pin, const String &label, double distance)
+{
+  // pulseInがタイムアウトするとdistanceは0になる。そのまま判定すると在荷扱いに
+  // なってしまうので、無効な計測としてLEDは直前の状態を保つ。
+  if (distance < DIST_MIN_VALID) {
+    return;
+  }
+
+  bool occupied = distance < BOX_OCCUPIED_THRE;
+  if (occupied == last_occupied) {
+    cnt_same++;
+  } else {
+    last_occupied = occupied;
+    cnt_same = 1;
+  }
+
+  // 単発のノイズでLEDがちらつかないよう、同じ判定が続いたときだけ切り替える
+  if (cnt_same < LED_DEBOUNCE || led_on == occupied) {
+    return;
+  }
+
+  led_on = occupied;
+  digitalWrite(led_pin, led_on ? HIGH : LOW);
+  USBSerial.println(label + "の在荷LED: " + (led_on ? "点灯" : "消灯"));
+}
+
 double DeliveryBox::measureDist(int Trg, int HCSR04Echo)
 {
   digitalWrite(Trg, LOW);
@@ -459,6 +499,7 @@ void measure_box(int i)
 {
   double distance = deliveryBox[i].measureDist(HCSR04Trg[i], HCSR04Echo[i]);
   USBSerial.println(BOX_LABEL[i] + "の距離: " + String(distance) + "cm");
+  deliveryBox[i].updateOccupiedLed(LED_PIN[i], BOX_LABEL[i], distance);
   int box_status = deliveryBox[i].judgeBoxOccupied(distance);
   // 送信はキュー経由。WiFiが切れていても計測とイベント検出は止めない。
   if (box_status == 2) {
@@ -495,6 +536,9 @@ void setup()
   for (int i = 0; i < BOX_NUM; i++) {
     pinMode(HCSR04Trg[i], OUTPUT);
     pinMode(HCSR04Echo[i], INPUT);
+    // ブート直後の中途半端な点灯を避けるため、出力にしたら即座にLOWへ落とす
+    pinMode(LED_PIN[i], OUTPUT);
+    digitalWrite(LED_PIN[i], LOW);
   }
 
   WiFi.mode(WIFI_STA);
